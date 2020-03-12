@@ -2,10 +2,37 @@ Description: POC Serverless data lake (prowe)
 Resources:
   CustomerBucket:
     Type: AWS::S3::Bucket
-  CustomerChangeStream:
-    Type: AWS::Kinesis::Stream
+  CustomerPipelineLogGroup:
+    Type: AWS::Logs::LogGroup
+  CustomerPipelineRole:
+    Type: AWS::IAM::Role
     Properties:
-      ShardCount: 1
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: firehose.amazonaws.com
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+  CustomerDeliveryStream:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamType: DirectPut
+      S3DestinationConfiguration:
+        BucketARN: !GetAtt CustomerBucket.Arn
+        CompressionFormat: GZIP
+        Prefix: 'raw-customer-events/'
+        RoleARN: !GetAtt CustomerPipelineRole.Arn
+        BufferingHints:
+          IntervalInSeconds: 60
+          SizeInMBs: 5
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName: !Ref CustomerPipelineLogGroup
+          LogStreamName: CustomerDeliveryStream
 Outputs:
   CustomerStreamName:
-    Value: !Ref CustomerChangeStream
+    Value: !Ref CustomerDeliveryStream

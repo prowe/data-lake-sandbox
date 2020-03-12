@@ -9,4 +9,5 @@ aws cloudformation package \
 
 aws cloudformation deploy \
     --stack-name=prowe-serverless-lake \
-    --template-file=cloudformation.transformed.yml
+    --template-file=cloudformation.transformed.yml \
+    --capabilities=CAPABILITY_IAM
