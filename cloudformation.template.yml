@@ -93,6 +93,30 @@ Resources:
         '--job-bookmark-option': job-bookmark-enable
         '--database-name': !Ref DatabaseName
         '--target-path': !Sub "s3://${CustomerBucket}/customer_dim"
+  CustomerDimCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      DatabaseName: !Ref DatabaseName
+      Role: !GetAtt CustomerPipelineRole.Arn
+      TablePrefix: ''
+      Targets:
+        S3Targets:
+          - Path: !Sub "${CustomerBucket}/customer_dim"
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: LOG
+      Configuration: |
+        {
+          "Version": 1.0,
+          "Grouping": {
+            "TableGroupingPolicy": "CombineCompatibleSchemas"
+          },
+          "CrawlerOutput": {
+            "Tables": {
+              "AddOrUpdateBehavior": "MergeNewColumns"
+            }
+          }
+        }
 Outputs:
   CustomerStreamName:
     Value: !Ref CustomerDeliveryStream

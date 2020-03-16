@@ -5,7 +5,6 @@ from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
 
-## @params: [JOB_NAME]
 args = getResolvedOptions(sys.argv, [
     "JOB_NAME",
     "database-name",
@@ -21,7 +20,7 @@ target_path = args["target-path"]
 
 source = glueContext.create_dynamic_frame.from_catalog(
     database=db_name,
-    table_name="raw_customersraw_customer_events"
+    table_name="raw_customersraw_customer_events",
     transformation_ctx="source")
 
 mapped_source = ApplyMapping.apply(
@@ -38,7 +37,7 @@ mapped_source = ApplyMapping.apply(
 existing_target = glueContext.create_dynamic_frame_from_options(
     connection_type = "s3",
     format = "glueparquet",
-    connection_options = {"path": target_path}
+    connection_options = {"path": target_path},
     transformation_ctx = "existing_target")
 
 merged_frame = mapped_source
@@ -47,9 +46,8 @@ if existing_target.toDF().take(1):
 
     merged_frame = table_exists_df.mergeDynamicFrame(
         stage_dynamic_frame = mapped_source,
-        primary_keys = ["id"]
-        transformation_ctx = "merged_frame"
-    )
+        primary_keys = ["id"],
+        transformation_ctx = "merged_frame")
 
 repartitioned_stream = merged_frame.repartition(2)
 written_data = glueContext.write_dynamic_frame.from_options(
