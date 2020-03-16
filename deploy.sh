@@ -10,4 +10,6 @@ aws cloudformation package \
 aws cloudformation deploy \
     --stack-name=prowe-serverless-lake \
     --template-file=cloudformation.transformed.yml \
-    --capabilities=CAPABILITY_IAM
+    --capabilities=CAPABILITY_IAM \
+    --parameter-overrides \
+        DatabaseName=prowe_customers

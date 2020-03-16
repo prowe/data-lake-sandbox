@@ -31,20 +31,25 @@ const kinesis = new AWS.Firehose({
     region: 'us-east-1'
 });
 
-async function loadCustomers() {
-    for(let i=0; i<100; i++) {
-        const start = Date.now();
-        const batch = chance.n(createCustomerEvent, 100);
-        await kinesis.putRecordBatch({
+async function loadCustomers(count) {
+    if (isNaN(count)) {
+        throw new Error('Not a number!');
+    }
+    console.log('loading: ', count);
+
+    let remaining = count;
+    while (remaining > 0) {
+        const batch = chance.n(createCustomerEvent, Math.min(remaining, 500));
+        const response = await kinesis.putRecordBatch({
             DeliveryStreamName: streamName,
             Records: batch.map(cust => ({
                 Data: JSON.stringify(cust) + '\n'
             }))
         }).promise();
 
-        console.log('loaded', i);
-        await throttle(start, 500);
+        remaining -= batch.length - response.FailedPutCount;
+        console.log(`Attempted: ${batch.length} Failed: ${response.FailedPutCount} Remaining: ${remaining}`);
     }
 }
 
-loadCustomers();
+loadCustomers(parseInt(process.argv[2]));

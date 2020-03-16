@@ -1,4 +1,7 @@
 Description: POC Serverless data lake (prowe)
+Parameters:
+  DatabaseName:
+    Type: String
 Resources:
   CustomerBucket:
     Type: AWS::S3::Bucket
@@ -13,10 +16,15 @@ Resources:
           - Effect: Allow
             Action: sts:AssumeRole
             Principal:
-              Service: firehose.amazonaws.com
+              Service:
+                - firehose.amazonaws.com
+                - glue.amazonaws.com
+                - sagemaker.amazonaws.com
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
         - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        - 'arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole'
+        - 'arn:aws:iam::aws:policy/AmazonSageMakerFullAccess'
   CustomerDeliveryStream:
     Type: AWS::KinesisFirehose::DeliveryStream
     Properties:
@@ -33,6 +41,58 @@ Resources:
           Enabled: true
           LogGroupName: !Ref CustomerPipelineLogGroup
           LogStreamName: CustomerDeliveryStream
+  CustomerDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Description: Customer Data
+        Name: !Ref DatabaseName
+  RawCustomerCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      DatabaseName: !Ref DatabaseName
+      Role: !GetAtt CustomerPipelineRole.Arn
+      TablePrefix: ''
+      Targets:
+        S3Targets:
+          - Path: !Sub "${CustomerBucket}/raw-customer-events"
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: LOG
+      Configuration: |
+        {
+          "Version": 1.0,
+          "Grouping": {
+            "TableGroupingPolicy": "CombineCompatibleSchemas"
+          },
+          "CrawlerOutput": {
+            "Tables": {
+              "AddOrUpdateBehavior": "MergeNewColumns"
+            }
+          }
+        }
+  CustomerWorkgroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Ref AWS::StackName
+      WorkGroupConfiguration:
+        ResultConfiguration:
+          OutputLocation: !Sub "s3://${CustomerBucket}/workgroup"
+  MergeIntoCustomerDimJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Command:
+        Name: glueetl
+        PythonVersion: "3"
+        ScriptLocation: "glue_scripts/merge_into_customer_dim.py"
+      GlueVersion: "1.0"
+      Role: !GetAtt CustomerPipelineRole.Arn
+      Timeout: 10 #minutes
+      DefaultArguments:
+        '--job-bookmark-option': job-bookmark-enable
+        '--database-name': !Ref DatabaseName
+        '--target-path': !Sub "s3://${CustomerBucket}/customer_dim"
 Outputs:
   CustomerStreamName:
     Value: !Ref CustomerDeliveryStream
