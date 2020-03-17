@@ -1,3 +1,4 @@
 node_modules
 *.transformed.yml
 env
+*.pyc
