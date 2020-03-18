@@ -27,22 +27,18 @@ def do_merge_data(staging_df, existing_target_df):
     repartitioned_stream = merged_frame.repartition(2)
     return repartitioned_stream
 
-def main():
-    args = getResolvedOptions(sys.argv, [
+def main(argv, glueContext, job):
+    args = getResolvedOptions(argv, [
         "JOB_NAME",
         "database_name",
         "source_table",
         "target_path"
         ])
-
-    glueContext = GlueContext(SparkContext.getOrCreate())
-    spark = glueContext.spark_session
-    job = Job(glueContext)
     job.init(args['JOB_NAME'], args)
 
     db_name = args["database_name"]
     source_table = args["source_table"]
-    staging_df = glueContext.create_dynamic_frame.from_catalog(
+    staging_df = glueContext.create_dynamic_frame_from_catalog(
         database=db_name,
         table_name=source_table,
         transformation_ctx="source")
@@ -55,7 +51,7 @@ def main():
 
     merged_result = do_merge_data(staging_df, exsting_target_df)
 
-    written_data = glueContext.write_dynamic_frame.from_options(
+    written_data = glueContext.write_dynamic_frame_from_options(
         frame = merged_result,
         connection_type = "s3",
         connection_options = {"path": target_path},
@@ -64,4 +60,5 @@ def main():
     job.commit()
 
 if __name__ == '__main__':
-    main()
+    glueContext = GlueContext(SparkContext.getOrCreate())
+    main(sys.argv, glueContext, Job(glueContext))
