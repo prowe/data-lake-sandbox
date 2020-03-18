@@ -1,4 +1,4 @@
 node_modules
 *.transformed.yml
 env
-*.pyc
+**/__pycache__
