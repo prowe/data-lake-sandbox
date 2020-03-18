@@ -12,15 +12,6 @@ from glue_scripts.pyspark_htest import PySparkTest
 from awsglue.job import Job
 
 class TestMergeIntoCustomerDim(PySparkTest):
-    input_schema = StructType([
-        StructField("id", StringType(), True),
-        StructField("firstname", StringType(), True),
-        StructField("lastname", StringType(), True),
-        StructField("birthdate", StringType(), True),
-        StructField("zipcode", StringType(), True),
-        StructField("modifieddate", StringType(), True)
-    ])
-
     output_schema = StructType([
         StructField("id", StringType(), True),
         StructField("first_name", StringType(), True),
@@ -43,9 +34,15 @@ class TestMergeIntoCustomerDim(PySparkTest):
         glue_context = GlueContext(self.spark)
 
         input_df = self.spark.createDataFrame([
-                ["01", "John", "Smith", "1990-01-01", "12345", "2019-01-01T00:40:32Z"]
-            ],
-            schema=self.input_schema)
+                {
+                    "id": "01",
+                    "firstname": "John",
+                    "lastname": "Smith",
+                    "birthdate": "1990-01-01",
+                    "zipcode": "12345",
+                    "modifieddate": "2019-01-01T00:40:32Z",
+                }
+            ])
         glue_context.create_dynamic_frame_from_catalog = MagicMock(
             return_value=DynamicFrame.fromDF(input_df, glue_context, 'staging_df'))
 
