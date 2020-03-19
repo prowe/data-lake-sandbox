@@ -74,7 +74,7 @@ class TestMergeIntoCustomerDim(PySparkTest):
             {
                 "id": "02",
                 "firstname": "Bob from staging",
-                "modifieddate": "2019-01-01T00:40:32Z"
+                "modifieddate": "2019-01-02T00:40:32Z"
             }
         ])
         self.__mock_existing_target(glue_context, [
@@ -100,7 +100,7 @@ class TestMergeIntoCustomerDim(PySparkTest):
 
         expected_df = input_df = self.spark.createDataFrame([
                 ["01", "Bill", None, None, None, datetime.fromisoformat("2019-01-02T00:40:32+00:00")],
-                ["02", "Bob from staging", None, None, None, datetime.fromisoformat("2019-01-01T00:40:32+00:00")]
+                ["02", "Bob from staging", None, None, None, datetime.fromisoformat("2019-01-02T00:40:32+00:00")]
             ], schema=self.output_schema)
 
         write_args, write_kargs = glue_context.write_dynamic_frame_from_options.call_args
