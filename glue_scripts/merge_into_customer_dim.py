@@ -2,28 +2,43 @@ import sys
 from awsglue.transforms import *
 from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
-from awsglue.context import GlueContext
+from awsglue.context import GlueContext, DynamicFrame
 from awsglue.job import Job
+from pyspark.sql.window import Window
+from pyspark.sql.functions import rank, col, row_number, desc
 import inspect
 
+def __handle_merging_frames(mapped_source, existing_target_df):
+    if not existing_target_df.toDF().take(1):
+        return mapped_source.toDF()
+
+    # return existing_target_df.toDF() \
+    #     .join(mapped_source.toDF(), "id", "outer")
+    return existing_target_df.toDF() \
+        .union(mapped_source.toDF())
+
+
 def __do_merge_data(staging_df, existing_target_df):
-    mapped_source = ApplyMapping.apply(
-        frame = staging_df,
-        mappings = [
-            ("id", "string", "id", "string"),
-            ("firstname", "string", "first_name", "string"),
-            ("lastname", "string", "last_name", "string"),
-            ("birthdate", "string", "birth_date", "date"),
-            ("zipcode", "string", "zipcode", "string"),
-            ("modifieddate", "string", "modified_date", "timestamp")
-        ])
+    mapped_source = staging_df.apply_mapping([
+        ("id", "string", "id", "string"),
+        ("firstname", "string", "first_name", "string"),
+        ("lastname", "string", "last_name", "string"),
+        ("birthdate", "string", "birth_date", "date"),
+        ("zipcode", "string", "zipcode", "string"),
+        ("modifieddate", "string", "modified_date", "timestamp")
+    ])
 
-    merged_frame = mapped_source
-    if existing_target_df.toDF().take(1):
-        merged_frame = existing_target_df.union(mapped_source)
+    merged_frame = __handle_merging_frames(mapped_source, existing_target_df)
+    merged_frame.show()
 
-    repartitioned_stream = merged_frame.repartition(2)
-    return repartitioned_stream
+    # merged_frame
+    window = Window.partitionBy('id').orderBy(desc('modified_date'))
+    deduped = merged_frame.withColumn("rn", row_number().over(window)) \
+        .filter(col("rn") == 1) \
+        .drop("rn")
+    deduped.show()
+
+    return deduped
 
 def main(argv, glueContext, job):
     args = getResolvedOptions(argv, [
@@ -49,8 +64,10 @@ def main(argv, glueContext, job):
 
     merged_result = __do_merge_data(staging_df, exsting_target_df)
 
+    repartitioned_stream = DynamicFrame.fromDF(merged_result, glueContext, 'merged_df') \
+        .repartition(2)
     written_data = glueContext.write_dynamic_frame_from_options(
-        frame = merged_result,
+        frame = repartitioned_stream,
         connection_type = "s3",
         connection_options = {"path": target_path},
         format = "glueparquet")

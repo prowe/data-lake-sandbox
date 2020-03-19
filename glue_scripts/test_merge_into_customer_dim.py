@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
 import logging
-import inspect
 import os
 from datetime import date, datetime
 from pyspark.sql import SparkSession
@@ -30,14 +29,14 @@ class TestMergeIntoCustomerDim(PySparkTest):
 
     def __mock_staging(self, glue_context, rows):
         input_df = self.spark.createDataFrame(rows)
-        glue_context.create_dynamic_frame_from_catalog = MagicMock(
-            return_value=DynamicFrame.fromDF(input_df, glue_context, 'staging_df'))
+        dynamic_df = DynamicFrame.fromDF(input_df, glue_context, 'staging_df')
+        dynamic_df.show()
+        glue_context.create_dynamic_frame_from_catalog = MagicMock(return_value=dynamic_df)
 
     def __mock_existing_target(self, glue_context, rows):
         existing_target_df = self.spark.createDataFrame(rows, self.output_schema)
         dynamic_df = DynamicFrame.fromDF(existing_target_df, glue_context, 'existing_target_df')
-        print(inspect.getmembers(dynamic_df))
-
+        dynamic_df.show()
         glue_context.create_dynamic_frame_from_options = MagicMock(return_value=dynamic_df)
 
     def test_sanity(self):
@@ -74,25 +73,25 @@ class TestMergeIntoCustomerDim(PySparkTest):
         self.__mock_staging(glue_context, [
             {
                 "id": "02",
-                "firstname": "Bob",
+                "firstname": "Bob from staging",
                 "modifieddate": "2019-01-01T00:40:32Z"
             }
         ])
         self.__mock_existing_target(glue_context, [
             {
                 "id": "01",
-                "firstname": "John",
-                "modifieddate": "2019-01-01T00:40:32Z"
+                "first_name": "John",
+                "modified_date": datetime.fromisoformat("2019-01-01T00:40:32+00:00")
             },
             {
                 "id": "02",
-                "firstname": "Bob",
-                "modifieddate": "2019-01-01T00:40:32Z"
+                "first_name": "Bob",
+                "modified_date": datetime.fromisoformat("2019-01-01T00:40:32+00:00")
             },
             {
                 "id": "01",
-                "firstname": "Bill",
-                "modifieddate": "2019-01-02T00:40:32Z"
+                "first_name": "Bill",
+                "modified_date": datetime.fromisoformat("2019-01-02T00:40:32+00:00")
             }
         ])
         glue_context.write_dynamic_frame_from_options = MagicMock()
@@ -100,8 +99,8 @@ class TestMergeIntoCustomerDim(PySparkTest):
         merge_into_customer_dim.main(self.argv, glue_context, mock_job)
 
         expected_df = input_df = self.spark.createDataFrame([
-                ["01", "Bill", None, None, None, datetime.fromisoformat("2019-01-02T00:40:32+00:00")]
-                ["02", "Bob", None, None, None, datetime.fromisoformat("2019-01-01T00:40:32+00:00")]
+                ["01", "Bill", None, None, None, datetime.fromisoformat("2019-01-02T00:40:32+00:00")],
+                ["02", "Bob from staging", None, None, None, datetime.fromisoformat("2019-01-01T00:40:32+00:00")]
             ], schema=self.output_schema)
 
         write_args, write_kargs = glue_context.write_dynamic_frame_from_options.call_args
