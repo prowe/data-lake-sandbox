@@ -4,8 +4,9 @@ from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
+import inspect
 
-def do_merge_data(staging_df, existing_target_df):
+def __do_merge_data(staging_df, existing_target_df):
     mapped_source = ApplyMapping.apply(
         frame = staging_df,
         mappings = [
@@ -13,16 +14,13 @@ def do_merge_data(staging_df, existing_target_df):
             ("firstname", "string", "first_name", "string"),
             ("lastname", "string", "last_name", "string"),
             ("birthdate", "string", "birth_date", "date"),
-            ("zipcode", "string", "zipcode", "string")
+            ("zipcode", "string", "zipcode", "string"),
+            ("modifieddate", "string", "modified_date", "timestamp")
         ])
 
     merged_frame = mapped_source
     if existing_target_df.toDF().take(1):
-        print("merging")
-
-        merged_frame = existing_target_df.mergeDynamicFrame(
-            stage_dynamic_frame = mapped_source,
-            primary_keys = ["id"])
+        merged_frame = existing_target_df.union(mapped_source)
 
     repartitioned_stream = merged_frame.repartition(2)
     return repartitioned_stream
@@ -49,7 +47,7 @@ def main(argv, glueContext, job):
         format = "glueparquet",
         connection_options = {"path": target_path})
 
-    merged_result = do_merge_data(staging_df, exsting_target_df)
+    merged_result = __do_merge_data(staging_df, exsting_target_df)
 
     written_data = glueContext.write_dynamic_frame_from_options(
         frame = merged_result,
