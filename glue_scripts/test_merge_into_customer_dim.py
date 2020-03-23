@@ -25,7 +25,7 @@ class TestMergeIntoCustomerDim(PySparkTest):
         "--JOB_NAME", "ut_job",
         "--database_name", "db_name",
         "--source_table", "ut_source",
-        "--target_path", "ut_target_path"]
+        "--target_path", "s3://ut_target_path"]
 
     def __mock_staging(self, glue_context, rows):
         input_df = self.spark.createDataFrame(rows)
@@ -57,6 +57,7 @@ class TestMergeIntoCustomerDim(PySparkTest):
             ])
         self.__mock_existing_target(glue_context, [])
         glue_context.write_dynamic_frame_from_options = MagicMock()
+        glue_context.purge_s3_path = MagicMock()
 
         merge_into_customer_dim.main(self.argv, glue_context, mock_job)
 
@@ -66,6 +67,32 @@ class TestMergeIntoCustomerDim(PySparkTest):
 
         write_args, write_kargs = glue_context.write_dynamic_frame_from_options.call_args
         self.assert_dataframe_equal(write_kargs['frame'].toDF(), expected_df, ["id"])
+
+    @patch('awsglue.job.Job')
+    def test_the_target_path_is_purged(self, mock_job):
+        glue_context = GlueContext(self.spark)
+        self.__mock_staging(glue_context, [
+                {
+                    "id": "01",
+                    "firstname": "John",
+                    "lastname": "Smith",
+                    "birthdate": "1990-01-01",
+                    "zipcode": "12345",
+                    "modifieddate": "2019-01-01T00:40:32Z",
+                }
+            ])
+        self.__mock_existing_target(glue_context, [])
+        glue_context.write_dynamic_frame_from_options = MagicMock()
+        glue_context.purge_s3_path = MagicMock()
+
+        merge_into_customer_dim.main(self.argv, glue_context, mock_job)
+
+        glue_context.purge_s3_path.assert_called_with(
+            s3_path = "s3://ut_target_path",
+            options = {
+                "retentionPeriod": 0
+            }
+        )
 
     @patch('awsglue.job.Job')
     def test_duplicate_rows_in_target_are_deduped(self, mock_job):
@@ -95,6 +122,7 @@ class TestMergeIntoCustomerDim(PySparkTest):
             }
         ])
         glue_context.write_dynamic_frame_from_options = MagicMock()
+        glue_context.purge_s3_path = MagicMock()
 
         merge_into_customer_dim.main(self.argv, glue_context, mock_job)
 

@@ -10,7 +10,7 @@ if (!streamName) {
 
 function createCustomerEvent() {
     const defaultMax = 1000000;
-    const randomNumber = chance.natural({ min: 1, max:  3});
+    const randomNumber = chance.natural({ min: 1, max:  10});
     return {
         id: randomNumber.toString().padStart(6, '0'),
         firstName: chance.first(),
