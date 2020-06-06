@@ -7,4 +7,4 @@ WORKDIR /work
 ADD . .
 
 WORKDIR /glue
-RUN /glue/bin/gluepytest /work/glue_scripts/
+RUN source ~/.bashrc && /glue/bin/gluepytest /work/glue_scripts/
